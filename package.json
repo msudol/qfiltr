@@ -1,7 +1,12 @@
 {
 	"name":"qfiltr",
-	"version":"0.0.6",
+	"version":"0.1.0",
 	"description":"A simple and powerful javascript filter, rate limit & queue system for data streams, APIs and other integrations.",
+	"license":"Apache-2.0",
+	"scripts": {
+		"test": "node --test",
+		"docs": "npx --yes jsdoc index.js README.md -d jsdoc"
+	},
     "keywords": [
     	"filtr",
     	"filter",

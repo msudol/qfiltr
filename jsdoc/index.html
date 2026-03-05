@@ -42,6 +42,198 @@
 
 
 
+    <section>
+        <article><h1>QFiltr</h1>
+<p>QFiltr is a powerful but simple filter, limiter &amp; queueing system that can be used to moderate or maintain a data stream. It was developed as part of a M2M/IoT cloud project in order to prevent devices from reporting data at too high rate, but has since been adapted as a standalone module for many possible uses.</p>
+<p>Some use cases:</p>
+<ul>
+<li>Use within an API in order to rate limit incoming requests.</li>
+<li>Use with UI interactions, like a button that can be rapidly pressed, to run a function via queue or rate limit.</li>
+<li>Use on a chat server, to detect and block spam.</li>
+<li>Use with M2M/IoT Cloud Data to limit or queue devices that report too rapidly.</li>
+</ul>
+<h2>Installation</h2>
+<p>QFiltr can be installed for use in a Node.js application via NPM, or for use in a basic javascript application or website by getting the standalone qfiltr.js from the GitHub Repository.</p>
+<h3>NPM</h3>
+<pre class="prettyprint source lang-bash"><code>npm install qfiltr
+</code></pre>
+<h3>Javascript</h3>
+<p>Get the standalone version from https://github.com/msudol/qfiltr</p>
+<ul>
+<li>Standalone version is in /tests/qfiltr.js</li>
+<li>See how to embed in javascript in /tests/basic-test.html</li>
+</ul>
+<h2>Basic Usage</h2>
+<p>Require the qfiltr module and create a new instance of qfiltr.</p>
+<pre class="prettyprint source lang-js"><code>var qfiltr = require(&quot;qfiltr&quot;);
+var qFiltr = new qfiltr();  
+
+qFiltr.COMMAND(&quot;id&quot;, {options}, callback(s))
+</code></pre>
+<h3>Functions</h3>
+<h4>qfiltr.limit(&quot;id&quot;, {limitCount:3, limitTime:1000}, success, fail)</h4>
+<p>Limit is a basic hard limit, where anything over X messages in Y seconds returns the fail callback, while anything that is under the limit returns the success callback.</p>
+<ul>
+<li>Options Object:
+<ul>
+<li>limitCount:3</li>
+<li>limitTime:1000</li>
+</ul>
+</li>
+<li>Callbacks:
+<ul>
+<li>Allow (Success)</li>
+<li>Block (Fail)</li>
+</ul>
+</li>
+</ul>
+<p>Example: No more than 5 messages or commands in 500ms.</p>
+<pre class="prettyprint source lang-js"><code>qFiltr.limit(&quot;limitExample&quot;, {limitCount:5, limitTime:500}, function() {
+    console.log(&quot;Allowed message&quot;);
+}, function() { 
+    console.log(&quot;Blocked message&quot;);
+});
+</code></pre>
+<h4>qfiltr.queue:</h4>
+<p>Queue is basic queueing function, feed messages in at any rate, and they are processed at the queue settings rate until the queue runs out.</p>
+<ul>
+<li>Options Object:
+<ul>
+<li>queueTimer:1000</li>
+<li>queueMax:-1 (no limit)</li>
+</ul>
+</li>
+<li>Callbacks:
+<ul>
+<li>OnQueue (Success)</li>
+<li>Queue Ended</li>
+<li>Maxed (Queue is full)</li>
+</ul>
+</li>
+</ul>
+<p>Example: Queue incoming messages or commands to be run every 2000ms until they are all run</p>
+<pre class="prettyprint source lang-js"><code>var qfiltr = require(&quot;qfiltr&quot;);
+qFiltr = new qfiltr();
+
+// call a bunch of messages really fast
+for (var i = 0; i &lt; 10; i++) {
+    sendMessage(&quot;This is message &quot; + i);
+}
+
+function sendMessage(message) {
+    // add message to qFiltr.queue with callback functions
+    qFiltr.queue(&quot;msgQ&quot;, {queueTimer:2000}, function() {
+        console.log(message);
+    }, function() {
+        console.log(&quot;Queue complete&quot;);
+    });  
+}
+</code></pre>
+<h4>qfiltr.qlimit:</h4>
+<p>QLimit is combo function combining rate limiting and queueing function, feed messages in at any rate until they exceed the rate limit, and then they are processed at the queue settings rate until the queue runs out.</p>
+<ul>
+<li>Options Object:
+<ul>
+<li>limitCount:3</li>
+<li>limitTime:1000</li>
+<li>queueTimer:1000</li>
+<li>queueMax:-1 (no limit)</li>
+</ul>
+</li>
+<li>Callbacks:
+<ul>
+<li>Allow (Success)</li>
+<li>LimitReached (Queue Starting)</li>
+<li>Queue Ended</li>
+<li>Maxed (Queue is full)</li>
+</ul>
+</li>
+</ul>
+<p>Example: Send 100 messages at random intervals, rate limit if it goes too fast and put into queue mode</p>
+<pre class="prettyprint source lang-js"><code>var qfiltr = require(&quot;qfiltr&quot;)
+qFiltr = new qfiltr();
+
+var sendStop = 0
+var overRate = false;
+var testAdjuster = 0;
+ 
+// send messages at random intervals
+function sender(t) { 
+    if (sendStop > 100) return;
+    sendStop++;
+    
+    if (overRate) { testAdjuster = 20 }
+    else { testAdjuster = 0}
+    
+    setTimeout(function() {
+        // generate new t
+        var i = Math.floor(Math.exp(Math.random()*Math.log(51 + testAdjuster)));
+        sendMessage(&quot;Message #&quot; + sendStop + &quot; sent at &quot; + i*10 + &quot;ms&quot;);
+        // run again
+        sender(i*10);
+    }, t);
+}
+ 
+function sendMessage(message) {
+    // add message to qFiltr.queue with callback functions 
+    qFiltr.qlimit(&quot;msgQ&quot;, {limitCount:10, limitTime:1000, queueTimer:100}, function() {
+        console.log(message);
+    }, function() {
+        overRate = true;
+        console.log(&quot;Rate limit exceeded, queuing data&quot;);
+    }, function() {
+        overRate = false;
+        console.log(&quot;Queue cleared resuming normal operation&quot;);        
+    });  
+}
+
+sender(1000);
+</code></pre>
+<h4>qfiltr.filter:</h4>
+<p>Filter allows or blocks a message based on one configured matcher.</p>
+<ul>
+<li>Matchers (pick one):
+<ul>
+<li><code>test(message, id, opts)</code> - custom predicate function</li>
+<li><code>regex</code> - <code>RegExp</code> or regex string</li>
+<li><code>match</code> - string or array of strings for contains checks</li>
+</ul>
+</li>
+<li>Options:
+<ul>
+<li><code>message</code> - message/value to evaluate (non-strings are converted to strings)</li>
+<li><code>caseSensitive:false</code> - used for string/regex-string matching</li>
+</ul>
+</li>
+<li>Callbacks:
+<ul>
+<li>Allow (Success)</li>
+<li>Block (Fail)</li>
+</ul>
+</li>
+</ul>
+<p>Example:</p>
+<pre class="prettyprint source lang-js"><code>qFiltr.filter(&quot;chatFilter&quot;, {message: &quot;hello world&quot;, regex: &quot;hello&quot;}, function() {
+    console.log(&quot;Allowed&quot;);
+}, function() {
+    console.log(&quot;Blocked&quot;);
+});
+</code></pre>
+<h3>Objects</h3>
+<p>The ID that you set in a filter function writes an entry into a &quot;datastore&quot;, so that you can have multiple filters running with different settings.</p>
+<p>This ID will also allow you to check if the current ID's queue is running or not.</p>
+<h4>Accessing the datastore</h4>
+<pre class="prettyprint source lang-js"><code>var idStore = qFiltr.dataStore[ID];
+console.log(&quot;Items current in queue:&quot; + idStore.length);
+</code></pre>
+<h4>Get Queue State</h4>
+<pre class="prettyprint source lang-js"><code>var isQRunning = qFiltr.qRunning[ID];
+</code></pre>
+<h3>Testing</h3>
+<pre class="prettyprint source lang-bash"><code>npm test
+</code></pre></article>
+    </section>
+
 
 
 
@@ -56,7 +248,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Sun Feb 04 2018 10:17:37 GMT-0500 (Eastern Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Wed Mar 04 2026 22:37:42 GMT-0500 (Eastern Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

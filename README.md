@@ -31,7 +31,7 @@ Get the standalone version from https://github.com/msudol/qfiltr
 
 ## Basic Usage
 
-Require the qfilter module and create a new instance of qfiltr.  
+Require the qfiltr module and create a new instance of qfiltr.  
 
 ```js
 var qfiltr = require("qfiltr");
@@ -89,7 +89,7 @@ for (var i = 0; i < 10; i++) {
 }
 
 function sendMessage(message) {
-    // add message to qFilter.queue with callback functions
+    // add message to qFiltr.queue with callback functions
     qFiltr.queue("msgQ", {queueTimer:2000}, function() {
         console.log(message);
     }, function() {
@@ -142,12 +142,12 @@ function sender(t) {
 }
  
 function sendMessage(message) {
-    // add message to qFilter.queue with callback functions 
+    // add message to qFiltr.queue with callback functions 
     qFiltr.qlimit("msgQ", {limitCount:10, limitTime:1000, queueTimer:100}, function() {
         console.log(message);
     }, function() {
         overRate = true;
-        console.log("Rate limit exceded, queuing data");
+        console.log("Rate limit exceeded, queuing data");
     }, function() {
         overRate = false;
         console.log("Queue cleared resuming normal operation");        
@@ -157,9 +157,30 @@ function sendMessage(message) {
 sender(1000);
 ```
 
-#### qfilter.filter:
+#### qfiltr.filter:
 
-The filter function is in development, and it's design will be tailored more toward something like a chat server, in which a condition will need to be met in order for the message to be allowed.
+Filter allows or blocks a message based on one configured matcher.
+
+- Matchers (pick one):
+  - `test(message, id, opts)` - custom predicate function
+  - `regex` - `RegExp` or regex string
+  - `match` - string or array of strings for contains checks
+- Options:
+  - `message` - message/value to evaluate (non-strings are converted to strings)
+  - `caseSensitive:false` - used for string/regex-string matching
+- Callbacks:
+  - Allow (Success)
+  - Block (Fail)
+
+Example:
+
+```js
+qFiltr.filter("chatFilter", {message: "hello world", regex: "hello"}, function() {
+    console.log("Allowed");
+}, function() {
+    console.log("Blocked");
+});
+```
 
 
 ### Objects
@@ -172,18 +193,19 @@ This ID will also allow you to check if the current ID's queue is running or not
 #### Accessing the datastore
 
 ```js
-var idStore = qFilter.dataStore[ID];
+var idStore = qFiltr.dataStore[ID];
 console.log("Items current in queue:" + idStore.length);
 ```
 
 
 #### Get Queue State
 ```js
-var isQRunning = qFilter.qRunning[ID];
+var isQRunning = qFiltr.qRunning[ID];
 ```
 
 
+### Testing
 
-### TODO
-
-- qfiltr.filter: pass filter regex / matching conditions along with message 
+```bash
+npm test
+```
