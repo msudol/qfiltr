@@ -1,7 +1,7 @@
 <html>
 <head>
 <title>QFfilter</title>
-<script src="qfiltr.js"></script>
+<script src="../dist/qfiltr.js"></script>
 
 <script type="text/javascript">
 
@@ -109,6 +109,68 @@ function sendMessage(message) {
     });  
 }
 
+function filterSmokeTests() {
+    var resultsNode = document.getElementById("filterSmokeResults");
+    var summaryNode = document.getElementById("filterSmokeSummary");
+    var passCount = 0;
+    var failCount = 0;
+
+    function printResult(ok, label) {
+        var node = document.createElement("LI");
+        node.style.color = ok ? "#0a7f2e" : "#b00020";
+        node.textContent = (ok ? "PASS: " : "FAIL: ") + label;
+        resultsNode.appendChild(node);
+        if (ok) {
+            passCount++;
+        }
+        else {
+            failCount++;
+        }
+    }
+
+    // regex string matcher should be case-insensitive by default
+    var regexAllowed = false;
+    qFiltr.filter("smokeRegex", {message: "HELLO", regex: "hello"}, function() {
+        regexAllowed = true;
+    }, function() {});
+    printResult(regexAllowed, "filter(regex string) allows case-insensitive match");
+
+    // array matcher should allow when any token is present
+    var arrayAllowed = false;
+    qFiltr.filter("smokeArray", {message: "there is spam here", match: ["ham", "spam"]}, function() {
+        arrayAllowed = true;
+    }, function() {});
+    printResult(arrayAllowed, "filter(match array) allows any matching token");
+
+    // predicate matcher should route to fail when predicate returns false
+    var predicateBlocked = false;
+    qFiltr.filter("smokePredicate", {
+        message: "safe",
+        test: function(message) {
+            return message === "unsafe";
+        }
+    }, function() {}, function() {
+        predicateBlocked = true;
+    });
+    printResult(predicateBlocked, "filter(test) routes non-matches to fail callback");
+
+    // missing matcher should throw
+    var threw = false;
+    try {
+        qFiltr.filter("smokeThrow", {message: "hello"}, function() {}, function() {});
+    }
+    catch (err) {
+        threw = true;
+    }
+    printResult(threw, "filter throws when no matcher is provided");
+
+    summaryNode.innerHTML = "Filter Smoke Tests: " + passCount + " passed, " + failCount + " failed";
+}
+
+window.onload = function() {
+    filterSmokeTests();
+};
+
 </script>
 
 </head>
@@ -150,6 +212,12 @@ function sendMessage(message) {
 <center>
     <button id="comboRunner" onClick="sender()">Run Function</button>
 </center>
+
+<center><h2>Filter Smoke Tests</h2></center>
+<table align="center" width="600"><tr><td>
+    <div id="filterSmokeSummary">Filter Smoke Tests: pending</div>
+    <ul id="filterSmokeResults"></ul>
+</td></tr></table>
 
 </body>
 </html>
