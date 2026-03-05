@@ -167,9 +167,9 @@ function filterSmokeTests() {
     summaryNode.innerHTML = "Filter Smoke Tests: " + passCount + " passed, " + failCount + " failed";
 }
 
-window.onload = function() {
+window.addEventListener('load', function() {
     filterSmokeTests();
-};
+});
 
 </script>
 
