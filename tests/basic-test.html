@@ -8,7 +8,7 @@
 // create instance of qfiltr
 var qFiltr = new qfiltr();
 
-// a random number generator to excersize the functions
+// a random number generator to exercise the functions
 var generateRandom = function generateRandom(start, count) {   
     var amount = count || 100;
     var begin = start || 0;
@@ -89,7 +89,7 @@ function sendMessage(message) {
 
     var state = document.getElementById("comboState");
 
-    // add message to qFilter.queue with callback functions 
+    // add message to qFiltr.queue with callback functions 
     qFiltr.qlimit("msgQ", {limitCount:10, limitTime:1000, queueTimer:100}, function() {
         console.log(message);
         var node = document.createElement("LI");                 
@@ -100,8 +100,8 @@ function sendMessage(message) {
         state.innerHTML = "Status: OK";             
     }, function() {
         overRate = true;
-        console.log("Rate limit exceded, queuing data");
-        state.innerHTML = "Rate limit exceded, queuing data";      
+        console.log("Rate limit exceeded, queuing data");
+        state.innerHTML = "Rate limit exceeded, queuing data";      
     }, function() {
         overRate = false;
         console.log("Queue cleared resuming normal operation");   

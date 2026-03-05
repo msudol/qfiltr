@@ -1,3 +1,10 @@
+v0.1.0
+- Implemented qfiltr.filter with support for custom test callbacks, regex matching, and string/array contains matching
+- Hardened callback handling so missing success/fail/end callbacks no longer crash runtime paths
+- Fixed option defaulting to preserve explicit 0 values for limits and queue settings
+- Improved queue safety for empty/mutating queue states and per-item timer handling
+- Added automated Node.js tests and npm test script
+
 v0.0.5
 - Fixed bug in qlimit combo function that was resending the datastore when going into queue mode
 

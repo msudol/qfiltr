@@ -7,7 +7,7 @@
 
 // create constructor
 var qfiltr = function() {
-    this.version = "0.0.6";
+    this.version = "0.1.0";
     this.config = {
         limitCount: 3,
         limitTime: 1000, 
@@ -19,21 +19,84 @@ var qfiltr = function() {
     this.qRunning = {}; 
 };
 
+qfiltr.prototype.hasOpt = function(opts, key) {
+    return Object.prototype.hasOwnProperty.call(opts, key);
+};
+
 // simple function to add an item to a dataStore object where id = obj.key and opts = json options
 qfiltr.prototype.addStore = function(id, opts) {
     (this.dataStore[id] = this.dataStore[id] || []).push(opts); 
 };
 
-// stub out the filter function, after all this is supposed to be qfiltr 
+// filter function for message matching and moderation flows
 qfiltr.prototype.filter = function(id, opts, success, fail) {
-    
-    //TODO: write this function, what will it do exactly?  
-    //possibly limit things matching a certain regex filter that can be passed as an argument?
+    opts = opts || {};
+
+    var onSuccess = typeof success === 'function' ? success : function() {};
+    var onFail = typeof fail === 'function' ? fail : function() {};
+    var message = opts.message;
+    var caseSensitive = this.hasOpt(opts, 'caseSensitive') ? !!opts.caseSensitive : false;
+    var matched = false;
+
+    if (message === undefined || message === null) {
+        message = '';
+    }
+    if (typeof message !== 'string') {
+        message = String(message);
+    }
+
+    if (typeof opts.test === 'function') {
+        matched = !!opts.test(message, id, opts);
+    }
+    else if (this.hasOpt(opts, 'regex')) {
+        var regex;
+
+        if (opts.regex instanceof RegExp) {
+            regex = opts.regex;
+        }
+        else if (typeof opts.regex === 'string') {
+            regex = new RegExp(opts.regex, caseSensitive ? '' : 'i');
+        }
+        else {
+            throw new TypeError('qfiltr.filter: opts.regex must be a RegExp or string');
+        }
+
+        if (regex.global || regex.sticky) {
+            regex.lastIndex = 0;
+        }
+        matched = regex.test(message);
+    }
+    else if (this.hasOpt(opts, 'match')) {
+        var source = caseSensitive ? message : message.toLowerCase();
+
+        if (typeof opts.match === 'string') {
+            var token = caseSensitive ? opts.match : opts.match.toLowerCase();
+            matched = source.indexOf(token) > -1;
+        }
+        else if (Array.isArray(opts.match)) {
+            matched = opts.match.some(function(item) {
+                var next = String(item);
+                next = caseSensitive ? next : next.toLowerCase();
+                return source.indexOf(next) > -1;
+            });
+        }
+        else {
+            throw new TypeError('qfiltr.filter: opts.match must be a string or array');
+        }
+    }
+    else {
+        throw new Error('qfiltr.filter requires one matcher: opts.test, opts.regex, or opts.match');
+    }
+
+    if (matched) {
+        return onSuccess(message, id, opts);
+    }
+    return onFail(message, id, opts);
 };
 
 /** @function
  * @name limit
- * @desciption A basic limit function, takes an id, opts, and callbacks for success and fail
+ * @description A basic limit function, takes an id, opts, and callbacks for success and fail
  * @param {string} id - Unique ID for this function thread.
  * @param {Object} opts - Configure options other than default.
  * @param {integer} [opts.limitCount=3] - Max count of calls within the limitTime (default: 3).
@@ -43,11 +106,12 @@ qfiltr.prototype.filter = function(id, opts, success, fail) {
 */ 
 qfiltr.prototype.limit = function(id, opts, success, fail) {
     
-    //TODO: err check user inputs
-    
     opts = opts || {};
-    opts.limitCount = opts.limitCount || this.config.limitCount;
-    opts.limitTime = opts.limitTime || this.config.limitTime;
+    opts.limitCount = this.hasOpt(opts, 'limitCount') ? opts.limitCount : this.config.limitCount;
+    opts.limitTime = this.hasOpt(opts, 'limitTime') ? opts.limitTime : this.config.limitTime;
+
+    var onSuccess = typeof success === 'function' ? success : function() {};
+    var onFail = typeof fail === 'function' ? fail : function() {};
     
     var now = Date.now();
 
@@ -63,17 +127,17 @@ qfiltr.prototype.limit = function(id, opts, success, fail) {
     
     // if there are too many items in the datastore - start fail function
     if (this.dataStore[id].length > opts.limitCount) {
-        return fail();
+        return onFail();
     }
     else {
-        return success();
+        return onSuccess();
     }
             
 };
 
 /** @function
  * @name queue 
- * @desciption A basic queue function that takes: id, opts, function callback and queue ended callback
+ * @description A basic queue function that takes: id, opts, function callback and queue ended callback
  * @param {string} id - Unique ID for this function thread.
  * @param {Object} opts - Configure options other than default.
  * @param {integer} [opts.queueTimer=1000] - Time in ms (default: 1000).
@@ -84,24 +148,27 @@ qfiltr.prototype.limit = function(id, opts, success, fail) {
 */
 qfiltr.prototype.queue = function(id, opts, success, end, maxed) {
 
-    //TODO: err check user inputs
-    
     this.qRunning[id] = this.qRunning[id] || false;
 
     opts = opts || {};
-    opts.queueTimer = opts.queueTimer || this.config.queueTimer;
-    opts.queueMax  = opts.queueMax || this.config.queueMax;
+    opts.queueTimer = this.hasOpt(opts, 'queueTimer') ? opts.queueTimer : this.config.queueTimer;
+    opts.queueMax  = this.hasOpt(opts, 'queueMax') ? opts.queueMax : this.config.queueMax;
+
+    var onSuccess = typeof success === 'function' ? success : function() {};
+    var onEnd = typeof end === 'function' ? end : function() {};
     
     var now = Date.now();
     
     // is the store for this ID at max? 
-    if ((this.dataStore[id] !== undefined) && (opts.queueMax > -1) && (this.dataStore[id].length >= opts.queueMax)) {
+    var queueLength = this.dataStore[id] ? this.dataStore[id].length : 0;
+    if ((opts.queueMax > -1) && (queueLength >= opts.queueMax)) {
         // if a queueMax was reached run callback if it is defined
         typeof maxed === 'function' && maxed();
+        return false;
     }    
     else {
         // add message to the queue
-        this.addStore(id, {ts:now, opts:opts, action:success, stop:end});
+        this.addStore(id, {ts:now, opts:opts, action:onSuccess, stop:onEnd});
     }
     
     // check the queue now to see if we need to kick start it
@@ -109,12 +176,14 @@ qfiltr.prototype.queue = function(id, opts, success, end, maxed) {
         this.runQueue(id, true);
     }
 
+    return true;
+
 };
 
 
 /** @function
  * @name qlimit
- * @desciption A combination limit and queue function, takes an id, opts, and callbacks for success, fail, end and maxed
+ * @description A combination limit and queue function, takes an id, opts, and callbacks for success, fail, end and maxed
  * @param {string} id - Unique ID for this function thread.
  * @param {Object} opts - Configure options other than default.
  * @param {integer} [opts.limitCount=3] - Max count of calls within the limitTime (default: 3).
@@ -128,25 +197,29 @@ qfiltr.prototype.queue = function(id, opts, success, end, maxed) {
 */ 
 qfiltr.prototype.qlimit = function(id, opts, success, fail, end, maxed) {
        
-    //TODO: err check user inputs
-    
     this.qRunning[id] = this.qRunning[id] || false;
+
+    var onSuccess = typeof success === 'function' ? success : function() {};
+    var onFail = typeof fail === 'function' ? fail : function() {};
+    var onEnd = typeof end === 'function' ? end : function() {};
        
     opts = opts || {};
-    opts.limitCount = opts.limitCount || this.config.limitCount;
-    opts.limitTime = opts.limitTime || this.config.limitTime;
-    opts.queueTimer = opts.queueTimer || this.config.queueTimer;
-    opts.queueMax  = opts.queueMax || this.config.queueMax;    
+    opts.limitCount = this.hasOpt(opts, 'limitCount') ? opts.limitCount : this.config.limitCount;
+    opts.limitTime = this.hasOpt(opts, 'limitTime') ? opts.limitTime : this.config.limitTime;
+    opts.queueTimer = this.hasOpt(opts, 'queueTimer') ? opts.queueTimer : this.config.queueTimer;
+    opts.queueMax  = this.hasOpt(opts, 'queueMax') ? opts.queueMax : this.config.queueMax;    
     
     var now = Date.now();
 
     // is the store for this ID at max? 
-    if ((this.dataStore[id] !== undefined) && (opts.queueMax > -1) && (this.dataStore[id].length >= opts.queueMax)) {
+    var queueLength = this.dataStore[id] ? this.dataStore[id].length : 0;
+    if ((opts.queueMax > -1) && (queueLength >= opts.queueMax)) {
         // if a queueMax was reached run callback if it is defined
         typeof maxed === 'function' && maxed();
+        return false;
     }    
     else {
-        this.addStore(id, {ts:now, opts:opts, action:success, stop:end});
+        this.addStore(id, {ts:now, opts:opts, action:onSuccess, stop:onEnd});
     }
     
     // need to check if this function has gone into queue mode or not here
@@ -162,19 +235,22 @@ qfiltr.prototype.qlimit = function(id, opts, success, fail, end, maxed) {
         // Limit fail - time to start queueing
         if (this.dataStore[id].length > opts.limitCount) {
            
-            typeof fail === 'function' && fail();
+            onFail();
 
             // need to clear the queue for the X messages leading up to the Q 
             this.dataStore[id].splice(0, this.dataStore[id].length - 1);
             this.lastQueue[id] = this.dataStore[id][0];
             this.runQueue(id, true); 
+            return false;
             
         }
         // Within limits and the queue is not running.. yay!
         else {
-            return success();
+            return onSuccess();
         }  
     }
+
+    return true;
             
 };
 
@@ -183,39 +259,52 @@ qfiltr.prototype.qlimit = function(id, opts, success, fail, end, maxed) {
 qfiltr.prototype.runQueue = function(id, init) {
 
     var self = this;
+    var queueStore = this.dataStore[id] || [];
     
     // if anything is in dataStore, run the queue
-    if (this.dataStore[id].length > 0) {
+    if (queueStore.length > 0) {
         
         this.qRunning[id] = true;
-        this.timer = self.dataStore[id][0].opts.queueTimer;
+        var timer = self.hasOpt(queueStore[0].opts || {}, 'queueTimer') ? queueStore[0].opts.queueTimer : self.config.queueTimer;
         // no need to wait for the queueTimer if the queue is initializing
         if (init) {
             // run the first item in the array
-            self.dataStore[id][0].action();
-            self.lastQueue[id] = self.dataStore[id][0] || self.lastQueue[id];
+            queueStore = self.dataStore[id] || [];
+            if (queueStore[0]) {
+                queueStore[0].action();
+                self.lastQueue[id] = queueStore[0] || self.lastQueue[id];
+            }
             // shift it out
-            self.dataStore[id].shift();
+            if (self.dataStore[id] && self.dataStore[id].length > 0) {
+                self.dataStore[id].shift();
+            }
             setTimeout(function() { 
                 // run this function again 
                 self.runQueue(id, false);
-            }, self.timer);                       
+            }, timer);                       
         }        
         else {
             setTimeout(function() { 
                 // run the first item in the array
-                self.dataStore[id][0].action();
-                self.lastQueue[id] = self.dataStore[id][0] || self.lastQueue[id];
+                var nextItem = (self.dataStore[id] || [])[0];
+                if (nextItem) {
+                    nextItem.action();
+                    self.lastQueue[id] = nextItem || self.lastQueue[id];
+                }
                 // shift it out
-                self.dataStore[id].shift();
+                if (self.dataStore[id] && self.dataStore[id].length > 0) {
+                    self.dataStore[id].shift();
+                }
                 // run this function again 
                 self.runQueue(id, false);
-            }, self.timer);
+            }, timer);
         }
     }
     else {
         this.qRunning[id] = false; 
-        this.lastQueue[id].stop();
+        if (this.lastQueue[id] && typeof this.lastQueue[id].stop === 'function') {
+            this.lastQueue[id].stop();
+        }
     }
     
 };
