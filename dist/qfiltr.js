@@ -5,9 +5,7 @@
  *  https://github.com/msudol/qfiltr 
  */
 
-// create constructor
 var qfiltr = function() {
-    this.version = "0.1.0";
     this.config = {
         limitCount: 3,
         limitTime: 1000, 
