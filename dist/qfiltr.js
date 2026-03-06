@@ -308,4 +308,11 @@ qfiltr.prototype.runQueue = function(id, init) {
 };
 
 
-module.exports = qfiltr;
+
+// Browser global export for standalone usage
+if (typeof window !== "undefined") {
+    window.qfiltr = qfiltr;
+}
+else if (typeof self !== "undefined") {
+    self.qfiltr = qfiltr;
+}

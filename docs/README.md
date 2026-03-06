@@ -25,7 +25,8 @@ npm install qfiltr
 
 Get the standalone version from https://github.com/msudol/qfiltr
 
-- Standalone version is in /tests/qfiltr.js
+- Build standalone with `npm run build:standalone`
+- Standalone version is in /dist/qfiltr.js
 - See how to embed in javascript in /tests/basic-test.html
 
 
